@@ -7,6 +7,36 @@ let
   cfg = config.programs.vim;
   defaultPlugins = [ "sensible" ];
 
+  knownSettings = {
+    background = types.enum [ "dark" "light" ];
+    expandtab = types.bool;
+    history = types.int;
+    number = types.bool;
+    relativenumber = types.bool;
+    shiftwidth = types.int;
+    tabstop = types.int;
+  };
+
+  vimSettingsType = types.submodule {
+    options =
+      let
+        opt = name: type: mkOption {
+          type = types.nullOr type;
+          default = null;
+          visible = false;
+        };
+      in
+        mapAttrs opt knownSettings;
+  };
+
+  setExpr = name: value:
+    let
+      v =
+        if isBool value then (if value then "" else "no") + name
+        else name + "=" + toString value;
+    in
+      optionalString (value != null) ("set " + v);
+
 in
 
 {
@@ -37,6 +67,38 @@ in
         '';
       };
 
+      settings = mkOption {
+        type = vimSettingsType;
+        default = {};
+        example = literalExample ''
+          {
+            expandtab = true;
+            history = 1000;
+            background = "dark";
+          }
+        '';
+        description = ''
+          At attribute set of Vim settings. The attribute names and
+          corresponding values must be among the following supported
+          options.
+
+          <informaltable frame="none"><tgroup cols="1"><tbody>
+          ${concatStringsSep "\n" (
+            mapAttrsToList (n: v: ''
+              <row>
+                <entry><varname>${n}</varname></entry>
+                <entry>${v.description}</entry>
+              </row>
+            '') knownSettings
+          )}
+          </tbody></tgroup></informaltable>
+
+          See the Vim documentation for detailed descriptions of these
+          options. Note, use <varname>extraConfig</varname> to
+          manually set any options not listed above.
+        '';
+      };
+
       extraConfig = mkOption {
         type = types.lines;
         default = "";
@@ -57,12 +119,11 @@ in
 
   config = (
     let
-      optionalBoolean = name: val: optionalString (val != null) (if val then "set ${name}" else "unset ${name}");
-      optionalInteger = name: val: optionalString (val != null) "set ${name}=${toString val}";
       customRC = ''
-        ${optionalBoolean "number" cfg.lineNumbers}
-        ${optionalInteger "tabstop" cfg.tabSize}
-        ${optionalInteger "shiftwidth" cfg.tabSize}
+        ${concatStringsSep "\n" (
+          filter (v: v != "") (
+          mapAttrsToList setExpr (
+          builtins.intersectAttrs knownSettings cfg.settings)))}
 
         ${cfg.extraConfig}
       '';
@@ -76,9 +137,20 @@ in
         ];
       };
 
-    in mkIf cfg.enable {
-      programs.vim.package = vim;
-      home.packages = [ cfg.package ];
-    }
+    in mkIf cfg.enable (mkMerge [
+      {
+        programs.vim.package = vim;
+        home.packages = [ cfg.package ];
+      }
+
+      (mkIf (cfg.lineNumbers != null) {
+        programs.vim.settings.number = cfg.lineNumbers;
+      })
+
+      (mkIf (cfg.tabSize != null) {
+        programs.vim.settings.tabstop = cfg.tabSize;
+        programs.vim.settings.shiftwidth = cfg.tabSize;
+      })
+    ])
   );
 }
