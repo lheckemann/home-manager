@@ -220,6 +220,21 @@ in
               };
         '';
       }
+
+      {
+        time = "2017-09-22T22:28:36+00:00";
+        condition =
+          config.xsession.enable && config.xsession.windowManager != null;
+        message = ''
+          The 'xsession.windowManager' option is now deprecated,
+          please use 'xsession.windowManagerExec' instead.
+
+          This change was made to prepare for window manager modules
+          under the 'xsession.windowManager' namespace. For example,
+          'xsession.windowManager.xmonad' and
+          'xsession.windowManager.i3'.
+        '';
+      }
     ];
   };
 }

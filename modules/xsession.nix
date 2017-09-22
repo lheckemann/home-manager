@@ -14,6 +14,15 @@ in
       enable = mkEnableOption "X Session";
 
       windowManager = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = ''
+          Path to window manager to exec. DEPRECATED: Use
+          <varname>xsession.windowManagerExec</varname> instead.
+        '';
+      };
+
+      windowManagerExec = mkOption {
         type = types.str;
         example = literalExample ''
           let
@@ -34,7 +43,14 @@ in
     };
   };
 
-  config = mkIf cfg.enable {
+  config = mkIf cfg.enable (mkMerge [
+    (mkIf (cfg.windowManager != null) {
+      warnings = [
+        "xsession.windowManager is deprecated, please use xsession.windowManagerExec"
+      ];
+
+      xsession.windowManagerExec = cfg.windowManager;
+    }) {
     systemd.user.services.setxkbmap = {
       Unit = {
         Description = "Set up keyboard in X";
@@ -93,7 +109,7 @@ in
 
         ${cfg.initExtra}
 
-        ${cfg.windowManager}
+        ${cfg.windowManagerExec}
 
         systemctl --user stop graphical-session.target
         systemctl --user stop graphical-session-pre.target
@@ -104,5 +120,5 @@ in
         done
       '';
     };
-  };
+  }]);
 }
